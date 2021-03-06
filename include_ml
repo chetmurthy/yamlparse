@@ -1,0 +1,18 @@
+#use "topfind.camlp5";;
+#require "oUnit";;
+#require "fmt";;
+#require "rresult";;
+#require "pcre";;
+#require "bos";;
+#require "yaml";;
+
+print_string "================ START ================\n";; flush stdout ;;
+
+
+
+(*
+;;; Local Variables: ***
+;;; mode:tuareg ***
+;;; End: ***
+
+*)

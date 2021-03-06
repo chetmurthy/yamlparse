@@ -1,0 +1,6 @@
+yamllexer.cmo :
+yamllexer.cmx :
+yamlparser.cmo : \
+    yamllexer.cmo
+yamlparser.cmx : \
+    yamllexer.cmx
