@@ -1,5 +1,6 @@
 *.cm*
 *.o
+lextest
 yamlparser
 *.opt
 yamllexer.ml

@@ -2,16 +2,21 @@
 OCAMLFIND=ocamlfind
 PACKAGES=fmt,camlp5.extprint,camlp5.extend,camlp5.pprintf,pcre,yaml
 
-all: yamlparser yamlparser.opt
+all: lextest #yamlparser yamlparser.opt
+
+lextest: yamllexer.cmo lextest.cmo
+	$(OCAMLFIND) ocamlc $(DEBUG) -package $(PACKAGES),oUnit -linkpkg -linkall -syntax camlp5r $^ -o $@
 
 yamlparser: yamllexer.cmo yamlparser.cmo
-	$(OCAMLFIND) ocamlc $(DEBUG) -package $(PACKAGES) -linkpkg -syntax camlp5r $^ -o $@
+	$(OCAMLFIND) ocamlc $(DEBUG) -package $(PACKAGES) -linkpkg -linkall -syntax camlp5r $^ -o $@
 
 yamlparser.opt: yamllexer.cmx yamlparser.cmx
-	$(OCAMLFIND) ocamlopt $(DEBUG) -package $(PACKAGES) -linkpkg -syntax camlp5r $^ -o $@
+	$(OCAMLFIND) ocamlopt $(DEBUG) -package $(PACKAGES) -linkpkg -linkall -syntax camlp5r $^ -o $@
 
 test:: all
-	echo '1+1 ; 1 - 1; 1 + (2 * 3)' | ./yamlparser
+	mkdir -p _build
+	./lextest
+#	echo '1+1 ; 1 - 1; 1 + (2 * 3)' | ./yamlparser
 
 .SUFFIXES: .mll .ml .cmo .cmx
 
@@ -20,6 +25,9 @@ yamllexer.cmo: yamllexer.ml
 
 yamllexer.cmx: yamllexer.ml
 	$(OCAMLFIND) ocamlopt $(DEBUG) -package $(PACKAGES) -syntax camlp5o -c $<
+
+lextest.cmo: lextest.ml
+	$(OCAMLFIND) ocamlc $(DEBUG) -package $(PACKAGES),oUnit -syntax camlp5o -c $<
 
 yamlparser.cmo: yamlparser.ml
 	$(OCAMLFIND) ocamlc $(DEBUG) -package $(PACKAGES) -syntax camlp5r -c $<
@@ -31,11 +39,11 @@ yamlparser.cmx: yamlparser.ml
 	ocamllex $<
 
 clean:
-	rm -f yamlparser yamlparser.opt *.cm* *.o yamllexer.ml
+	rm -f yamlparser yamlparser.opt *.cm* *.o yamllexer.ml _build *.log *.cache
 
 
 depend::
-	$(OCAMLFIND) ocamldep $(DEBUG) -package $(PACKAGES) -syntax camlp5o yamllexer.ml > .depend.NEW || true
+	$(OCAMLFIND) ocamldep $(DEBUG) -package $(PACKAGES) -syntax camlp5o yamllexer.ml lextest.ml > .depend.NEW || true
 	$(OCAMLFIND) ocamldep $(DEBUG) -package $(PACKAGES) -syntax camlp5r yamlparser.ml >> .depend.NEW \
 		&& mv .depend.NEW .depend
 
