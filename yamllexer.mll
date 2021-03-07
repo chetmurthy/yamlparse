@@ -1,13 +1,13 @@
 {
 
 let locate ~comments lb v =
-  let loc = Ploc.make_unlined (Lexing.lexeme_start lb, Lexing.lexeme_end lb) in
-  let loc = Ploc.with_comment loc comments in
+  let open Lexing in
+  let spos = lexeme_start_p lb in
+  let epos = lexeme_end lb in
+  let loc = Ploc.make_loc "" spos.pos_lnum spos.pos_bol (spos.pos_cnum, epos) comments in
   (v, loc)
 
-let locate_no_comments lb v =
-  let loc = Ploc.make_unlined (Lexing.lexeme_start lb, Lexing.lexeme_end lb) in
-  (v, loc)
+let locate_no_comments lb v = locate ~comments:"" lb v
 
 module St = struct
 type style =
@@ -19,6 +19,7 @@ type value_token =
   | KEY of string
   | DASH
   | DQSTRING of string
+  | RAWSTRING of string
   | EOI
 
 type token = (string * string) * Ploc.t
@@ -42,6 +43,7 @@ let indent = ' '+
 let wschar = [' ' '\t']
 let linews = [' ' '\t']+
 let newline = '\r'? '\n'
+let linechar = [^ '\r' '\n']
 let decimal_digit = ['0'-'9']
 let decimal = decimal_digit+
 let comment = "#" [^ '\n']* '\n'
@@ -62,10 +64,16 @@ let dqstring = '"' ( [^ '"']
    ) '"'
 
 rule _indent = parse
-  | indent ? { locate_no_comments lexbuf (String.length (Lexing.lexeme lexbuf)) }
+  | indent ? { locate_no_comments lexbuf () }
+
+and _key_or_ident keys = parse
+  | wschar* ":" wschar+ { locate_no_comments lexbuf (St.KEY keys) }
+  | linechar* { locate_no_comments lexbuf (St.RAWSTRING (keys^(Lexing.lexeme lexbuf))) }
 
 and _valuetoken = parse
-  | newline { locate_no_comments lexbuf St.NEWLINE }
+  | newline { let rv = locate_no_comments lexbuf St.NEWLINE in Lexing.new_line lexbuf ; rv }
+  | ident { _key_or_ident (Lexing.lexeme lexbuf) lexbuf }
+  | dqstring { _key_or_ident (Lexing.lexeme lexbuf) lexbuf }
   | eof { locate_no_comments lexbuf St.EOI }
 
 {
@@ -85,7 +93,8 @@ let rec tokenize st lexbuf =
     h
 
   | {pushback = [] ; bol = true; style_stack = ((BLOCK m)::t as sst)} ->
-    let (n,loc) = _indent lexbuf in
+    let (_,loc) = _indent lexbuf in
+    let n = Ploc.last_pos loc - Ploc.bol_pos loc in
     st.bol <- false ;
     if n = m then
       tokenize st lexbuf
@@ -103,9 +112,9 @@ let rec tokenize st lexbuf =
   | {pushback = []; bol = false ; style_stack = (BLOCK _)::_} ->
     match _valuetoken lexbuf with
       (EOI,loc) -> (("EOI",""),loc)
-    | (NEWLINE,loc ->
+    | (NEWLINE,loc) ->
        st.bol <- true ;
-       tokenze st lexbuf
+       tokenize st lexbuf
 
 let make_token () =
   let st = St.mk() in

@@ -16,12 +16,24 @@ let tokens s =
 
 let tests = "lexing" >::: [
     "token-1" >:: (fun ctxt ->
-        assert_equal ~printer:pp_tokens [("INDENT", ""); ("EOI", "")]
+        assert_equal ~printer:pp_tokens
+          [("INDENT", ""); ("EOI", "")]
           (List.map fst (tokens "  "))
-      ; assert_equal ~printer:pp_tokens [("INDENT", ""); ("EOI", "")]
+      ; assert_equal ~printer:pp_tokens
+          [("INDENT","")
+          ;("INDENT","")
+          ;("DEDENT","")
+          ;("DEDENT","")
+          ;("EOI","")]
           (List.map fst (tokens {|  
     
   |}))
+      )
+  ; "token-2" >:: (fun ctxt ->
+        assert_raises (Failure "pop_styles: dedent did not move back to previous indent position")
+          (fun () -> (tokens {|  
+    
+   |}))
       )
 ]
 ;;

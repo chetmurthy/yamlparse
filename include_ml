@@ -25,7 +25,14 @@ print_string "================ START ================\n";; flush stdout ;;
 
 #load "yamllexer.cmo";;
 #load "lextest.cmo";;
-
+open Yamllexer ;;
+open Lextest ;;
+#trace _indent ;;
+#trace _valuetoken ;;
+#trace tokenize ;;
+#trace Ploc.make_loc ;;
+#trace Lexing.lexeme_start_p ;;
+#trace Lexing.lexeme_end ;;
 
 (*
 ;;; Local Variables: ***
