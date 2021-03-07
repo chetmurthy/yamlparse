@@ -19,8 +19,7 @@ type style =
 
 type value_token =
     NEWLINE
-  | KEY of string
-  | DQKEY of string
+  | KEYVALUE of string * string
   | DASH
   | DQSTRING of string
   | BLOCKSTRING of string
@@ -72,8 +71,11 @@ rule _indent = parse
 
 and _valuetoken = parse
   | newline { let rv = locate_no_comments lexbuf St.NEWLINE in Lexing.new_line lexbuf ; Some rv }
-  | (ident as keys) wschar* ":" wschar+ { Some (locate_no_comments lexbuf (St.KEY keys)) }
-  | (dqstring as keys) wschar* ":" wschar+ { Some (locate_no_comments lexbuf (St.DQKEY keys)) }
+  | ((ident|dqstring) as keys) wschar* ":" wschar+
+    (((dqstring as vals) wschar* )
+    | ((linechar # '"') linechar* as vals)) (newline|eof)
+      { Some (locate_no_comments lexbuf (St.KEYVALUE (keys, vals))) }
+
   | "- " { Some (locate_no_comments lexbuf St.DASH) }
   | eof { Some (locate_no_comments lexbuf St.EOI) }
   | "" { None }
@@ -121,8 +123,17 @@ let rec tokenize st lexbuf =
     | Some (NEWLINE,loc) ->
        st.bol <- true ;
        tokenize st lexbuf
-    | Some (KEY k, loc) -> (("KEY", k), loc)
-    | Some (DQKEY k, loc) -> (("DQKEY", k), loc)
+    | Some (KEYVALUE (k,v), loc) ->
+      let valtok =
+        if String.get v 0 = '"' then
+          (("DQSTRING",v),loc)
+        else (("RAWSTRING",v),loc) in
+      st.pushback <- [valtok] ;
+      if String.get k 0 = '"' then
+        (("DQKEY", k), loc)
+      else
+        (("KEY", k), loc)
+
     | None ->
       match _blockstring lexbuf with
         (BLOCKSTRING s,loc) -> (("BLOCKSTRING",s),loc)

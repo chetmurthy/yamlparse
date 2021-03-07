@@ -42,13 +42,20 @@ let tests = "lexing" >::: [
           ;("EOI","")]
           (List.map fst (tokens {|a : "b"|}))
       )
-(*
   ; "token-4" >:: (fun ctxt ->
         assert_equal ~printer:pp_tokens
-          []
+          [("KEY","a")
+          ;("RAWSTRING",{|b: "c"|})
+          ;("EOI","")]
           (List.map fst (tokens {|a : b: "c"|}))
       )
-*)
+  ; "token-5" >:: (fun ctxt ->
+        assert_equal ~printer:pp_tokens
+          [("KEY","a")
+          ;("RAWSTRING","b c")
+          ;("EOI","")]
+          (List.map fst (tokens {|a : b c|}))
+      )
 ]
 ;;
 
