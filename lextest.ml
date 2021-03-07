@@ -12,19 +12,9 @@ let tokens s =
   in tokrec ()
 
 let tests = "lexing" >::: [
-    "indent-1" >:: (fun ctxt ->
-        ()
-      )
-  ; "token-1" >:: (fun ctxt ->
-        let tok = make_token () in
-        let lb = Lexing.from_string "  " in
-        assert_equal ("INDENT", "") (fst (tok lb))
-      )
-  ; "token-2" >:: (fun ctxt ->
-        let tok = make_token () in
-        let lb = Lexing.from_string "  " in
-        assert_equal ("INDENT", "") (fst (tok lb)) ;
-        assert_equal ("EOI", "") (fst (tok lb))
+    "token-1" >:: (fun ctxt ->
+        assert_equal [("INDENT", ""); ("EOI", "")]
+          (List.map fst (tokens "  "))
       )
 ]
 ;;
