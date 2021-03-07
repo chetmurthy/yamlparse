@@ -1,5 +1,7 @@
-lextest.cmo :
-lextest.cmx :
+lextest.cmo : \
+    yamllexer.cmo
+lextest.cmx : \
+    yamllexer.cmx
 yamllexer.cmo :
 yamllexer.cmx :
 yamlparser.cmo : \

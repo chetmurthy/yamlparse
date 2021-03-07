@@ -102,7 +102,10 @@ let rec tokenize st lexbuf =
 
   | {pushback = []; bol = false ; style_stack = (BLOCK _)::_} ->
     match _valuetoken lexbuf with
-    (EOI,loc) -> (("EOI",""),loc)
+      (EOI,loc) -> (("EOI",""),loc)
+    | (NEWLINE,loc ->
+       st.bol <- true ;
+       tokenze st lexbuf
 
 let make_token () =
   let st = St.mk() in
