@@ -4,3 +4,4 @@ lextest
 yamlparser
 *.opt
 yamllexer.ml
+_build

@@ -17,13 +17,15 @@ type style =
 type token = (string * string) * Ploc.t
 
 type t = {
-  pushback : token list ref
-; style_stack : style list ref
+  mutable pushback : token list
+; mutable style_stack : style list
+; mutable bol : bool
 }
 
 let mk () = {
-  pushback = ref []
-; style_stack = ref [BLOCK 0]
+  pushback = []
+; style_stack = [BLOCK 0]
+; bol = true
 }
 end
 
@@ -60,11 +62,43 @@ and tok2 = parse
   | "1" { 1 }
   | "0" { 0 }
   
-and indent = parse
+and _indent = parse
   | indent ? { locate_no_comments lexbuf (String.length (Lexing.lexeme lexbuf)) }
 
 {
+open St
+let rec pop_styles loc rev_pushback = function
+    ((BLOCK m)::sst, n) when n < m -> pop_styles loc ((("DEDENT",""),loc)::rev_pushback) (sst, n)
+  | ((BLOCK m)::sst, n) when n = m && m > 0 -> ((("DEDENT",""),loc)::rev_pushback, sst)
+  | ((BLOCK m)::sst, n) when n = m && m = 0 ->
+    assert (sst = []) ;
+    ((("DEDENT",""),loc)::rev_pushback, [BLOCK 0])
+  | _ -> failwith "pop_styles: dedent did not move back to previous indent position"
 
-let x = 1
+let rec tokenize st lexbuf =
+  match st with
+    {pushback = h :: t} ->
+    st.pushback <- t ;
+    h
 
+  | {pushback = [] ; bol = true; style_stack = ((BLOCK m)::t as sst)} ->
+    let (n,loc) = _indent lexbuf in
+    st.bol <- false ;
+    if n = m then
+      tokenize st lexbuf
+    else if n > m then begin
+      st.style_stack <- (BLOCK n)::sst ;
+      (("INDENT",""),loc)
+    end
+    else (* n < m *) begin
+      let (rev_pushback, new_sst) = pop_styles loc [] (st.style_stack, n) in
+      st.pushback <- List.rev rev_pushback ;
+      st.style_stack <- new_sst ;
+      tokenize st lexbuf
+    end
+
+
+let make_token () =
+  let st = St.mk() in
+  fun lexbuf -> tokenize st lexbuf
 }
