@@ -1,13 +1,16 @@
 {
 
-let locate ~comments lb v =
+let locate ~comments ?spos lb v =
   let open Lexing in
-  let spos = lexeme_start_p lb in
+  let spos = match spos with None -> lexeme_start_p lb | Some spos -> spos in
   let epos = lexeme_end lb in
   let loc = Ploc.make_loc "" spos.pos_lnum spos.pos_bol (spos.pos_cnum, epos) comments in
   (v, loc)
 
-let locate_no_comments lb v = locate ~comments:"" lb v
+let locate_no_comments ?spos lb v =
+  let open Lexing in
+  let spos = match spos with None -> lexeme_start_p lb | Some spos -> spos in
+  locate ~spos:spos ~comments:"" lb v
 
 module St = struct
 type style =
@@ -17,9 +20,10 @@ type style =
 type value_token =
     NEWLINE
   | KEY of string
+  | DQKEY of string
   | DASH
   | DQSTRING of string
-  | RAWSTRING of string
+  | BLOCKSTRING of string
   | EOI
 
 type token = (string * string) * Ploc.t
@@ -66,15 +70,17 @@ let dqstring = '"' ( [^ '"']
 rule _indent = parse
   | indent ? { locate_no_comments lexbuf () }
 
-and _key_or_ident keys = parse
-  | wschar* ":" wschar+ { locate_no_comments lexbuf (St.KEY keys) }
-  | linechar* { locate_no_comments lexbuf (St.RAWSTRING (keys^(Lexing.lexeme lexbuf))) }
-
 and _valuetoken = parse
-  | newline { let rv = locate_no_comments lexbuf St.NEWLINE in Lexing.new_line lexbuf ; rv }
-  | ident { _key_or_ident (Lexing.lexeme lexbuf) lexbuf }
-  | dqstring { _key_or_ident (Lexing.lexeme lexbuf) lexbuf }
-  | eof { locate_no_comments lexbuf St.EOI }
+  | newline { let rv = locate_no_comments lexbuf St.NEWLINE in Lexing.new_line lexbuf ; Some rv }
+  | (ident as keys) wschar* ":" wschar+ { Some (locate_no_comments lexbuf (St.KEY keys)) }
+  | (dqstring as keys) wschar* ":" wschar+ { Some (locate_no_comments lexbuf (St.DQKEY keys)) }
+  | "- " { Some (locate_no_comments lexbuf St.DASH) }
+  | eof { Some (locate_no_comments lexbuf St.EOI) }
+  | "" { None }
+
+and _blockstring = parse
+  | dqstring { locate_no_comments lexbuf (St.DQSTRING (Lexing.lexeme lexbuf)) }
+  | linechar+ { locate_no_comments lexbuf (St.BLOCKSTRING (Lexing.lexeme lexbuf)) }
 
 {
 open St
@@ -111,10 +117,16 @@ let rec tokenize st lexbuf =
 
   | {pushback = []; bol = false ; style_stack = (BLOCK _)::_} ->
     match _valuetoken lexbuf with
-      (EOI,loc) -> (("EOI",""),loc)
-    | (NEWLINE,loc) ->
+      Some (EOI,loc) -> (("EOI",""),loc)
+    | Some (NEWLINE,loc) ->
        st.bol <- true ;
        tokenize st lexbuf
+    | Some (KEY k, loc) -> (("KEY", k), loc)
+    | Some (DQKEY k, loc) -> (("DQKEY", k), loc)
+    | None ->
+      match _blockstring lexbuf with
+        (BLOCKSTRING s,loc) -> (("BLOCKSTRING",s),loc)
+      | (DQSTRING k, loc) -> (("DQSTRING", k), loc)
 
 let make_token () =
   let st = St.mk() in

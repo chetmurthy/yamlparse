@@ -28,6 +28,7 @@ print_string "================ START ================\n";; flush stdout ;;
 open Yamllexer ;;
 open Lextest ;;
 #trace _indent ;;
+#trace _key_or_ident ;;
 #trace _valuetoken ;;
 #trace tokenize ;;
 #trace Ploc.make_loc ;;
