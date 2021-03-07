@@ -5,6 +5,7 @@
 #require "pcre";;
 #require "bos";;
 #require "yaml";;
+#require "camlp5.pa_o";;
 
 print_string "================ START ================\n";; flush stdout ;;
 

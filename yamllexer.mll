@@ -14,6 +14,13 @@ type style =
     BLOCK of int
   | FLOW
 
+type value_token =
+    NEWLINE
+  | KEY of string
+  | DASH
+  | DQSTRING of string
+  | EOI
+
 type token = (string * string) * Ploc.t
 
 type t = {
@@ -54,16 +61,12 @@ let dqstring = '"' ( [^ '"']
     | '\\' 'x' ['0'-'9' 'a'-'f' 'A'-'F'] ['0'-'9' 'a'-'f' 'A'-'F']
    ) '"'
 
-rule tok1 = parse
-  | "true" { true }
-  | "false" { false }
-
-and tok2 = parse
-  | "1" { 1 }
-  | "0" { 0 }
-  
-and _indent = parse
+rule _indent = parse
   | indent ? { locate_no_comments lexbuf (String.length (Lexing.lexeme lexbuf)) }
+
+and _valuetoken = parse
+  | newline { locate_no_comments lexbuf St.NEWLINE }
+  | eof { locate_no_comments lexbuf St.EOI }
 
 {
 open St
@@ -97,6 +100,9 @@ let rec tokenize st lexbuf =
       tokenize st lexbuf
     end
 
+  | {pushback = []; bol = false ; style_stack = (BLOCK _)::_} ->
+    match _valuetoken lexbuf with
+    (EOI,loc) -> (("EOI",""),loc)
 
 let make_token () =
   let st = St.mk() in

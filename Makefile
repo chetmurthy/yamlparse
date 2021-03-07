@@ -1,5 +1,6 @@
 
 OCAMLFIND=ocamlfind
+NOT_OCAMLFIND=not-ocamlfind
 PACKAGES=fmt,camlp5.extprint,camlp5.extend,camlp5.pprintf,pcre,yaml
 
 all: lextest #yamlparser yamlparser.opt
@@ -20,6 +21,9 @@ test:: all
 
 .SUFFIXES: .mll .ml .cmo .cmx
 
+foo.ppo: foo.ml
+	$(NOT_OCAMLFIND) preprocess -package $(PACKAGES),camlp5.pr_o -syntax camlp5o $< > $@
+
 yamllexer.cmo: yamllexer.ml
 	$(OCAMLFIND) ocamlc $(DEBUG) -package $(PACKAGES) -syntax camlp5o -c $<
 
@@ -37,9 +41,10 @@ yamlparser.cmx: yamlparser.ml
 
 .mll.ml:
 	ocamllex $<
+#	perl -p -i -e 's,#.*,,' $@
 
 clean:
-	rm -f yamlparser yamlparser.opt *.cm* *.o yamllexer.ml _build *.log *.cache
+	rm -f lextest yamlparser yamlparser.opt *.cm* *.o yamllexer.ml _build *.log *.cache
 
 
 depend::
