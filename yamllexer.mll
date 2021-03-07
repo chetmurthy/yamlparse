@@ -19,6 +19,7 @@ type style =
 
 type value_token =
     NEWLINE
+  | KEY of string
   | KEYVALUE of string * string
   | DASH
   | DQSTRING of string
@@ -74,7 +75,15 @@ and _valuetoken = parse
   | ((ident|dqstring) as keys) wschar* ":" wschar+
     (((dqstring as vals) wschar* )
     | ((linechar # '"') linechar* as vals)) (newline|eof)
-      { Some (locate_no_comments lexbuf (St.KEYVALUE (keys, vals))) }
+      { let rv = Some (locate_no_comments lexbuf (St.KEYVALUE (keys, vals))) in
+        Lexing.new_line lexbuf ;
+        rv
+      }
+  | ((ident|dqstring) as keys) wschar* ":" wschar* (newline|eof)
+      { let rv = Some (locate_no_comments lexbuf (St.KEY keys)) in
+        Lexing.new_line lexbuf ;
+        rv
+      }
 
   | "- " { Some (locate_no_comments lexbuf St.DASH) }
   | eof { Some (locate_no_comments lexbuf St.EOI) }
@@ -86,13 +95,40 @@ and _blockstring = parse
 
 {
 open St
-let rec pop_styles loc rev_pushback = function
+let rec pop_styles loc (rev_pushback : St.token list) = function
     ((BLOCK m)::sst, n) when n < m -> pop_styles loc ((("DEDENT",""),loc)::rev_pushback) (sst, n)
   | ((BLOCK m)::sst, n) when n = m && m > 0 -> ((("DEDENT",""),loc)::rev_pushback, sst)
   | ((BLOCK m)::sst, n) when n = m && m = 0 ->
     assert (sst = []) ;
-    ((("DEDENT",""),loc)::rev_pushback, [BLOCK 0])
+    (rev_pushback, [BLOCK 0])
   | _ -> failwith "pop_styles: dedent did not move back to previous indent position"
+
+let extract_indent_position loc =
+  Ploc.first_pos loc - Ploc.bol_pos loc
+
+let handle_indents_with st toks =
+  assert (st.pushback = []) ;
+  assert (toks <> []) ;
+  match st.style_stack with
+    (BLOCK m)::_ ->
+    let (_, loc) = List.hd toks in
+    let n = extract_indent_position loc in
+    if n = m then begin
+      st.pushback <- List.tl toks ;
+      List.hd toks
+    end
+    else if n > m then begin
+      st.style_stack <- (BLOCK n)::st.style_stack ;
+      st.pushback <- toks ;
+      (("INDENT",""),loc)
+    end
+    else (* n < m *) begin
+      let (rev_pushback, new_sst) = pop_styles loc [] (st.style_stack, n) in
+      let new_pushback = (List.rev rev_pushback)@toks in
+      st.pushback <- List.tl new_pushback ;
+      st.style_stack <- new_sst ;
+      List.hd new_pushback
+    end  
 
 let rec tokenize st lexbuf =
   match st with
@@ -100,39 +136,41 @@ let rec tokenize st lexbuf =
     st.pushback <- t ;
     h
 
-  | {pushback = [] ; bol = true; style_stack = ((BLOCK m)::t as sst)} ->
-    let (_,loc) = _indent lexbuf in
-    let n = Ploc.last_pos loc - Ploc.bol_pos loc in
+  | {pushback = [] ; bol = true; style_stack = ((BLOCK m)::_)} ->
+    _indent lexbuf ;
     st.bol <- false ;
-    if n = m then
-      tokenize st lexbuf
-    else if n > m then begin
-      st.style_stack <- (BLOCK n)::sst ;
-      (("INDENT",""),loc)
-    end
-    else (* n < m *) begin
-      let (rev_pushback, new_sst) = pop_styles loc [] (st.style_stack, n) in
-      st.pushback <- List.rev rev_pushback ;
-      st.style_stack <- new_sst ;
-      tokenize st lexbuf
-    end
+    tokenize st lexbuf
 
   | {pushback = []; bol = false ; style_stack = (BLOCK _)::_} ->
     match _valuetoken lexbuf with
-      Some (EOI,loc) -> (("EOI",""),loc)
+      Some (EOI,loc) ->
+      handle_indents_with st [(("EOI",""),loc)]
+      
     | Some (NEWLINE,loc) ->
        st.bol <- true ;
        tokenize st lexbuf
+
     | Some (KEYVALUE (k,v), loc) ->
+      st.bol <- true ;
       let valtok =
         if String.get v 0 = '"' then
           (("DQSTRING",v),loc)
         else (("RAWSTRING",v),loc) in
-      st.pushback <- [valtok] ;
-      if String.get k 0 = '"' then
-        (("DQKEY", k), loc)
-      else
-        (("KEY", k), loc)
+      let keytok =
+        if String.get k 0 = '"' then
+          (("DQKEY", k), loc)
+        else
+          (("KEY", k), loc) in
+      handle_indents_with st [keytok;valtok]
+
+    | Some (KEY k, loc) ->
+      st.bol <- true ;
+      let keytok =
+        if String.get k 0 = '"' then
+          (("DQKEY", k), loc)
+        else
+          (("KEY", k), loc) in
+      handle_indents_with st [keytok]
 
     | None ->
       match _blockstring lexbuf with

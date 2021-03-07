@@ -15,25 +15,32 @@ let tokens s =
   in tokrec ()
 
 let tests = "lexing" >::: [
-    "token-1" >:: (fun ctxt ->
-        assert_equal ~printer:pp_tokens
-          [("INDENT", ""); ("EOI", "")]
-          (List.map fst (tokens "  "))
-      ; assert_equal ~printer:pp_tokens
-          [("INDENT","")
-          ;("INDENT","")
-          ;("DEDENT","")
-          ;("DEDENT","")
-          ;("EOI","")]
-          (List.map fst (tokens {|  
-    
-  |}))
-      )
-  ; "token-2" >:: (fun ctxt ->
+    "token-2" >:: (fun ctxt ->
         assert_raises (Failure "pop_styles: dedent did not move back to previous indent position")
-          (fun () -> (tokens {|  
-    
-   |}))
+          (fun () -> (tokens {|
+  a: b
+    b: c
+   d: e
+|}))
+      )
+  ; "token-2''" >:: (fun ctxt ->
+        assert_equal ~printer:pp_tokens
+          [("INDENT","")
+          ;("KEY","a")
+          ;("INDENT","")
+          ;("KEY","b")
+          ;("RAWSTRING","c")
+          ;("KEY","d")
+          ;("RAWSTRING","e")
+          ;("DEDENT","")
+          ;("DEDENT","")
+          ;("EOI","")
+          ]
+          (List.map fst (tokens {|
+  a:
+   b: c
+   d: e
+|}))
       )
   ; "token-3" >:: (fun ctxt ->
         assert_equal ~printer:pp_tokens

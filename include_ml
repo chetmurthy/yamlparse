@@ -28,12 +28,11 @@ print_string "================ START ================\n";; flush stdout ;;
 open Yamllexer ;;
 open Lextest ;;
 #trace _indent ;;
-#trace _key_or_ident ;;
+#trace pop_styles ;;
+#trace handle_indents_with ;;
+#trace extract_indent_position ;;
 #trace _valuetoken ;;
 #trace tokenize ;;
-#trace Ploc.make_loc ;;
-#trace Lexing.lexeme_start_p ;;
-#trace Lexing.lexeme_end ;;
 
 (*
 ;;; Local Variables: ***
