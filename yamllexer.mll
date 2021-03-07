@@ -70,22 +70,34 @@ let dqstring = '"' ( [^ '"']
 rule _indent = parse
   | indent ? { locate_no_comments lexbuf () }
 
-and _valuetoken = parse
-  | newline { let rv = locate_no_comments lexbuf St.NEWLINE in Lexing.new_line lexbuf ; Some rv }
+and _valuetoken st = parse
+  | newline {
+      let rv = locate_no_comments lexbuf St.NEWLINE in
+      st.St.bol <- true ;
+      Lexing.new_line lexbuf ;
+      Some rv }
   | ((ident|dqstring) as keys) wschar* ":" wschar+
     (((dqstring as vals) wschar* )
     | ((linechar # '"') linechar* as vals)) (newline|eof)
       { let rv = Some (locate_no_comments lexbuf (St.KEYVALUE (keys, vals))) in
+        st.St.bol <- true ;
         Lexing.new_line lexbuf ;
         rv
       }
   | ((ident|dqstring) as keys) wschar* ":" wschar* (newline|eof)
       { let rv = Some (locate_no_comments lexbuf (St.KEY keys)) in
+        st.St.bol <- true ;
         Lexing.new_line lexbuf ;
         rv
       }
 
   | "- " { Some (locate_no_comments lexbuf St.DASH) }
+  | "-" (newline|eof) {
+      let rv = Some (locate_no_comments lexbuf St.DASH) in
+      st.St.bol <- true ;
+      Lexing.new_line lexbuf ;
+      rv
+    }
   | eof { Some (locate_no_comments lexbuf St.EOI) }
   | "" { None }
 
@@ -103,16 +115,18 @@ let rec pop_styles loc (rev_pushback : St.token list) = function
     (rev_pushback, [BLOCK 0])
   | _ -> failwith "pop_styles: dedent did not move back to previous indent position"
 
-let extract_indent_position loc =
-  Ploc.first_pos loc - Ploc.bol_pos loc
+let extract_indent_position = function
+    (("EOI",""), _) -> 0
+  | (_, loc) ->
+    Ploc.first_pos loc - Ploc.bol_pos loc
 
 let handle_indents_with st toks =
   assert (st.pushback = []) ;
   assert (toks <> []) ;
   match st.style_stack with
     (BLOCK m)::_ ->
-    let (_, loc) = List.hd toks in
-    let n = extract_indent_position loc in
+    let (_, loc as tok) = List.hd toks in
+    let n = extract_indent_position tok in
     if n = m then begin
       st.pushback <- List.tl toks ;
       List.hd toks
@@ -142,16 +156,14 @@ let rec tokenize st lexbuf =
     tokenize st lexbuf
 
   | {pushback = []; bol = false ; style_stack = (BLOCK _)::_} ->
-    match _valuetoken lexbuf with
+    match _valuetoken st lexbuf with
       Some (EOI,loc) ->
       handle_indents_with st [(("EOI",""),loc)]
       
     | Some (NEWLINE,loc) ->
-       st.bol <- true ;
        tokenize st lexbuf
 
     | Some (KEYVALUE (k,v), loc) ->
-      st.bol <- true ;
       let valtok =
         if String.get v 0 = '"' then
           (("DQSTRING",v),loc)
@@ -164,13 +176,15 @@ let rec tokenize st lexbuf =
       handle_indents_with st [keytok;valtok]
 
     | Some (KEY k, loc) ->
-      st.bol <- true ;
       let keytok =
         if String.get k 0 = '"' then
           (("DQKEY", k), loc)
         else
           (("KEY", k), loc) in
       handle_indents_with st [keytok]
+
+    | Some (DASH, loc) ->
+      handle_indents_with st [(("DASH",""),loc)]
 
     | None ->
       match _blockstring lexbuf with

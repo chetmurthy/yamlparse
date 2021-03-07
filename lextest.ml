@@ -63,6 +63,11 @@ let tests = "lexing" >::: [
           ;("EOI","")]
           (List.map fst (tokens {|a : b c|}))
       )
+  ; "token-5" >:: (fun ctxt ->
+        assert_equal ~printer:pp_tokens
+          [("DASH","");("BLOCKSTRING","a");("EOI","")]
+          (List.map fst (tokens {|- a|}))
+      )
 ]
 ;;
 

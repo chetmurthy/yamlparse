@@ -32,6 +32,7 @@ open Lextest ;;
 #trace handle_indents_with ;;
 #trace extract_indent_position ;;
 #trace _valuetoken ;;
+#trace _blockstring ;;
 #trace tokenize ;;
 
 (*
