@@ -65,7 +65,7 @@ let dqstring = '"' ( [^ '"']
     | '\\' ['0'-'9'] ['0'-'9'] ['0'-'9']
     | '\\' 'o' ['0'-'7'] ['0'-'7'] ['0'-'7']
     | '\\' 'x' ['0'-'9' 'a'-'f' 'A'-'F'] ['0'-'9' 'a'-'f' 'A'-'F']
-   ) '"'
+   )* '"'
 
 rule _indent = parse
   | indent ? { locate_no_comments lexbuf () }
@@ -103,7 +103,7 @@ and _valuetoken st = parse
 
 and _blockstring = parse
   | dqstring { locate_no_comments lexbuf (St.DQSTRING (Lexing.lexeme lexbuf)) }
-  | linechar+ { locate_no_comments lexbuf (St.BLOCKSTRING (Lexing.lexeme lexbuf)) }
+  | (linechar # '"') linechar* { locate_no_comments lexbuf (St.BLOCKSTRING (Lexing.lexeme lexbuf)) }
 
 {
 open St

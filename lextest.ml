@@ -14,8 +14,18 @@ let tokens s =
     | t -> t::(tokrec ())
   in tokrec ()
 
-let tests = "lexing" >::: [
-    "token-1-busted" >:: (fun ctxt ->
+let lex_test name toks s =
+  name >:: (fun ctxt ->
+      assert_equal ~printer:pp_tokens
+        toks
+        (List.map fst (tokens s))
+    )
+
+let lex_test1 (a,b,c) = lex_test a b c
+
+
+let busted_tests = "busted" >::: [
+    "token-1" >:: (fun ctxt ->
         assert_raises (Failure "pop_styles: dedent did not move back to previous indent position")
           (fun () -> (tokens {|
   a: b
@@ -23,77 +33,66 @@ let tests = "lexing" >::: [
    d: e
 |}))
       )
-  ; "token-2''" >:: (fun ctxt ->
-        assert_equal ~printer:pp_tokens
-          [("INDENT","")
-          ;("KEY","a")
-          ;("INDENT","")
-          ;("KEY","b")
-          ;("RAWSTRING","c")
-          ;("KEY","d")
-          ;("RAWSTRING","e")
-          ;("DEDENT","")
-          ;("DEDENT","")
-          ;("EOI","")
-          ]
-          (List.map fst (tokens {|
+  ]
+
+let ok_tests = "ok" >::: (List.map lex_test1 [
+    ("token-2''"
+    ,[("INDENT","");("KEY","a");("INDENT","");("KEY","b")
+     ;("RAWSTRING","c");("KEY","d");("RAWSTRING","e");("DEDENT","")
+     ;("DEDENT","");("EOI","")]
+    ,{|
   a:
    b: c
    d: e
-|}))
-      )
-  ; "token-3" >:: (fun ctxt ->
-        assert_equal ~printer:pp_tokens
-          [("KEY","a")
-          ;("DQSTRING",{|"b"|})
-          ;("EOI","")]
-          (List.map fst (tokens {|a : "b"|}))
-      )
-  ; "token-4" >:: (fun ctxt ->
-        assert_equal ~printer:pp_tokens
-          [("KEY","a")
-          ;("RAWSTRING",{|b: "c"|})
-          ;("EOI","")]
-          (List.map fst (tokens {|a : b: "c"|}))
-      )
-  ; "token-5" >:: (fun ctxt ->
-        assert_equal ~printer:pp_tokens
-          [("KEY","a")
-          ;("RAWSTRING","b c")
-          ;("EOI","")]
-          (List.map fst (tokens {|a : b c|}))
-      )
-  ; "token-6" >:: (fun ctxt ->
-        assert_equal ~printer:pp_tokens
-          [("KEY","a")
-          ;("RAWSTRING","b c")
-          ;("KEY","b")
-          ;("RAWSTRING","b c")
-          ;("EOI","")]
-          (List.map fst (tokens {|
+|})
+  ;("token-3"
+   ,[("KEY","a");("DQSTRING",{|"b"|});("EOI","")]
+   ,{|a : "b"|})
+  ;("token-4"
+   ,[("KEY","a");("RAWSTRING",{|b: "c"|});("EOI","")]
+   ,{|a : b: "c"|})
+
+  ;("token-5"
+   ,[("KEY","a");("RAWSTRING","b c");("EOI","")]
+   ,{|a : b c|})
+  ;("token-6"
+   ,[("KEY","a");("RAWSTRING","b c");("KEY","b");("RAWSTRING","b c");("EOI","")]
+   ,{|
 a : b c
 b : b c
-|}))
-      )
-  ; "token-7" >:: (fun ctxt ->
-        assert_equal ~printer:pp_tokens
-          [("DASH","");("BLOCKSTRING","a");("EOI","")]
-          (List.map fst (tokens {|- a|}))
-      )
-  ; "token-8" >:: (fun ctxt ->
-        assert_equal ~printer:pp_tokens
-          [("DASH","")
-          ;("BLOCKSTRING","a")
-          ;("DASH","")
-          ;("BLOCKSTRING","b")
-          ;("EOI","")]
-          (List.map fst (tokens {|
+|})
+  ;("token-7"
+   ,[("DASH","");("BLOCKSTRING","a");("EOI","")]
+   ,{|- a|})
+
+  ;("token-8"
+   ,[("DASH","");("BLOCKSTRING","a");("DASH","")
+    ;("BLOCKSTRING","b");("EOI","")]
+   ,{|
 - a
 - b
-|}))
-      )
-]
+|})
+  ;("token-9"
+   ,[("DQSTRING",{|"foo"|});("EOI","")]
+       ,{|
+"foo"
+|})
+  ;("token-10"
+   ,[("DQSTRING","\"foo\"");("EOI","")]
+   ,{|
+  "foo"
+|})
+  ;("token-11"
+   ,[("KEY","a");("DQSTRING",{|"foo"|});("EOI","")]
+   ,{|
+a:
+  "foo"
+|})
+
+  ])
 ;;
+
+let tests = "all" >::: [busted_tests ; ok_tests]
 
 if not !Sys.interactive then
   run_test_tt_main tests
