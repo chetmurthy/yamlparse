@@ -44,7 +44,7 @@ yamlparser.cmx: yamlparser.ml
 #	perl -p -i -e 's,#.*,,' $@
 
 clean:
-	rm -f lextest yamlparser yamlparser.opt *.cm* *.o yamllexer.ml _build *.log *.cache
+	rm -rf lextest yamlparser yamlparser.opt *.cm* *.o yamllexer.ml _build *.log *.cache
 
 
 depend::
