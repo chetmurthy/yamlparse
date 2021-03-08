@@ -12,6 +12,8 @@ let locate_no_comments ?spos lb v =
   let spos = match spos with None -> lexeme_start_p lb | Some spos -> spos in
   locate ~spos:spos ~comments:"" lb v
 
+type token = (string * string) * Ploc.t
+
 module St = struct
 type style =
     BLOCK of int
@@ -25,8 +27,6 @@ type value_token =
   | DQSTRING of string
   | BLOCKSTRING of string
   | EOI
-
-type token = (string * string) * Ploc.t
 
 type t = {
   mutable pushback : token list
@@ -107,7 +107,7 @@ and _blockstring = parse
 
 {
 open St
-let rec pop_styles loc (rev_pushback : St.token list) = function
+let rec pop_styles loc (rev_pushback : token list) = function
     ((BLOCK m)::sst, n) when n < m -> pop_styles loc ((("DEDENT",""),loc)::rev_pushback) (sst, n)
   | ((BLOCK m)::sst, n) when n = m && m > 0 -> ((("DEDENT",""),loc)::rev_pushback, sst)
   | ((BLOCK m)::sst, n) when n = m && m = 0 ->
